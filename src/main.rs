@@ -33,8 +33,7 @@ struct Operation {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct OperationParameter {
-    #[serde(rename = "typeuse std::fs::File;
-use std::io::prelude::*;")]
+    #[serde(rename = "type")]
     type_field: Option<String>,
     description: String,
     name: String,
@@ -60,7 +59,7 @@ fn main() {
 
     let schema: Schema = serde_json::from_str(&file).expect("to parse the json");
 
-    let json_str = serde_json::to_string(&schema).expect("to create string");
+    let json_str = serde_json::to_string_pretty(&schema).expect("to create string");
     let mut file = File::create("data.json").expect("Failed to create file");
     file.write_all(json_str.as_bytes())
         .expect("Failed to write to file");
