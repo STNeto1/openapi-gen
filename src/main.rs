@@ -10,6 +10,7 @@ struct Schema {
     #[serde(rename = "basePath")]
     base_path: String,
     paths: HashMap<String, Path>,
+    definitions: HashMap<String, Definition>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -52,6 +53,24 @@ struct ResponsePayload {
 struct SchemaRef {
     #[serde(rename = "$ref")]
     _ref: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Definition {
+    #[serde(rename = "type")]
+    type_field: String,
+    properties: Option<HashMap<String, DefinitionProperty>>,
+    #[serde(rename = "enum")]
+    _enum: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct DefinitionProperty {
+    #[serde(rename = "type")]
+    type_field: Option<String>,
+    #[serde(rename = "$ref")]
+    _ref: Option<String>,
+    items: Option<HashMap<String, String>>,
 }
 
 fn main() {
