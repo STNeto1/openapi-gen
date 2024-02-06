@@ -66,6 +66,7 @@ struct Definition {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct DefinitionProperty {
+    description: Option<String>,
     #[serde(rename = "type")]
     type_field: Option<String>,
     #[serde(rename = "$ref")]
