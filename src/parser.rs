@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 type DefinitionMap = HashMap<String, Definition>;
 type OperationResponseMap = HashMap<String, ResponsePayload>;
-type DefinitionPropertyMap = HashMap<String, DefinitionProperty>;
+pub type DefinitionPropertyMap = HashMap<String, DefinitionProperty>;
 type KV = HashMap<String, String>;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -14,7 +14,7 @@ pub struct Schema {
     #[serde(rename = "basePath")]
     base_path: String,
     paths: HashMap<String, Path>,
-    definitions: DefinitionMap,
+    pub definitions: DefinitionMap,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -68,12 +68,12 @@ enum DefinitionType {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct Definition {
+pub struct Definition {
     #[serde(rename = "type")]
     type_field: DefinitionType,
-    properties: Option<DefinitionPropertyMap>,
+    pub properties: Option<DefinitionPropertyMap>,
     #[serde(rename = "enum")]
-    _enum: Option<Vec<String>>,
+    pub _enum: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -91,7 +91,7 @@ enum DefinitionPropertyType {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct DefinitionProperty {
+pub struct DefinitionProperty {
     description: Option<String>,
     #[serde(rename = "type")]
     type_field: Option<DefinitionPropertyType>,
@@ -104,60 +104,110 @@ fn encode_kv_to_ts_object(kv: &KV) -> String {
     let mut res = String::new();
 
     kv.iter().for_each(|(key, value)| {
-        res.push_str(format!("{}:{};", key, value).as_str());
+        res.push_str(format!("{}:{};", key, clear_ref(value)).as_str());
     });
 
     return res;
 }
 
-fn create_raw_type_from_properties(props: &DefinitionPropertyMap) -> String {
+pub fn normalize_key(key: &String) -> String {
+    key.replace(".", "_")
+}
+
+pub fn clear_ref(ref_string: &String) -> String {
+    normalize_key(ref_string).replace("#/definitions/", "")
+}
+
+pub fn parse_enum(props: &Definition) -> String {
+    match &props._enum {
+        Some(values) => values
+            .iter()
+            .map(|v| format!("'{}'", v).to_string())
+            .collect::<Vec<String>>()
+            .join(" | "),
+        None => "".to_string(),
+    }
+}
+
+pub fn create_raw_type_from_properties(props: &DefinitionPropertyMap) -> String {
+    let tokens: Vec<String> = props
+        .iter()
+        .map(|(key, value)| {
+            //println!("{} -> {:?}", key, value);
+
+            let mut inner = String::new();
+
+            inner.push_str(format!("{}:", key).as_str());
+
+            if value.type_field.is_some() {
+                match value.type_field.clone().unwrap() {
+                    DefinitionPropertyType::String => inner.push_str("string;"),
+                    DefinitionPropertyType::Integer => inner.push_str("number;"),
+                    DefinitionPropertyType::Boolean => inner.push_str("boolean;"),
+                    DefinitionPropertyType::Array => {
+                        if value._ref.is_some() {
+                            inner.push_str(format!("{}[];", value._ref.clone().unwrap()).as_str())
+                        }
+
+                        if value.items.is_some() {
+                            let items = value.items.clone().unwrap();
+
+                            if items.contains_key("$ref") {
+                                inner.push_str(
+                                    format!("{}[];", clear_ref(items.get("$ref").unwrap()))
+                                        .as_str(),
+                                );
+                            } else {
+                                let encoded = encode_kv_to_ts_object(&items);
+
+                                inner.push_str(format!("{{{}}}[];", encoded).as_str());
+                            }
+                        }
+
+                        if value._ref.is_none() && value.items.is_none() {
+                            warn!("Array type without ref or items");
+                        }
+                    }
+                    DefinitionPropertyType::Object => {
+                        if value._ref.is_some() {
+                            inner.push_str(format!("{};", value._ref.clone().unwrap()).as_str());
+                        }
+
+                        if value.items.is_some() {
+                            let encoded = encode_kv_to_ts_object(&value.items.clone().unwrap());
+
+                            inner.push_str(format!("{{{encoded}}};").as_str());
+                        }
+
+                        if value._ref.is_none() && value.items.is_none() {
+                            warn!("Object type without ref or items");
+
+                            inner.push_str("never;");
+                        }
+                    }
+                }
+
+                return inner;
+            }
+
+            if value._ref.is_some() {
+                inner.push_str(clear_ref(&value._ref.clone().unwrap()).as_str());
+                inner.push_str(";");
+
+                return inner;
+            }
+
+            inner.push_str("never;");
+
+            return inner;
+        })
+        .collect::<_>();
+
     let mut res = String::new();
     res.push_str("{");
 
-    props.iter().for_each(|(key, value)| {
-        let mut inner = String::new();
-
-        inner.push_str(format!("{}:", key).as_str());
-
-        if value.type_field.is_some() {
-            match value.type_field.clone().unwrap() {
-                DefinitionPropertyType::String => inner.push_str("string;"),
-                DefinitionPropertyType::Integer => inner.push_str("number;"),
-                DefinitionPropertyType::Boolean => inner.push_str("boolean;"),
-                DefinitionPropertyType::Array => {
-                    if value._ref.is_some() {
-                        inner.push_str(format!("{}[];", value._ref.clone().unwrap()).as_str())
-                    }
-
-                    if value.items.is_some() {
-                        let encoded = encode_kv_to_ts_object(&value.items.clone().unwrap());
-
-                        inner.push_str(format!("{{{}}}[];", encoded).as_str());
-                    }
-
-                    if value._ref.is_none() && value.items.is_none() {
-                        warn!("Array type without ref or items");
-                    }
-                }
-                DefinitionPropertyType::Object => {
-                    if value._ref.is_some() {
-                        inner.push_str(format!("{};", value._ref.clone().unwrap()).as_str())
-                    }
-
-                    if value.items.is_some() {
-                        let encoded = encode_kv_to_ts_object(&value.items.clone().unwrap());
-
-                        inner.push_str(format!("{{{}}};", encoded).as_str());
-                    }
-
-                    if value._ref.is_none() && value.items.is_none() {
-                        warn!("Object type without ref or items");
-                    }
-                }
-            }
-        }
-
-        res.push_str(&inner);
+    tokens.iter().for_each(|t| {
+        res.push_str(t.as_str());
     });
 
     res.push_str("}");
@@ -310,8 +360,6 @@ mod test {
 
         let response = create_raw_type_from_properties(&properties);
 
-        // println!("{}", response);
-
         assert!(response.contains("some1:number;"));
         assert!(response.contains("some2:string;"));
         assert!(response.contains("some3:boolean;"));
@@ -319,5 +367,41 @@ mod test {
         assert!(response.contains("some5:{some:string;}[];"));
         assert!(response.contains("some6:ref_type;"));
         assert!(response.contains("some7:{some:string;}"));
+    }
+
+    #[test]
+    fn parse_property_with_only_ref() {
+        let mut properties: DefinitionPropertyMap = HashMap::new();
+        properties.insert(
+            "some".into(),
+            DefinitionProperty {
+                description: None,
+                type_field: None,
+                _ref: Some("ref_type".to_string()),
+                items: None,
+            },
+        );
+
+        let response = create_raw_type_from_properties(&properties);
+
+        assert!(response.contains("some:ref_type;"));
+    }
+
+    #[test]
+    fn parse_property_without_nothign() {
+        let mut properties: DefinitionPropertyMap = HashMap::new();
+        properties.insert(
+            "some".into(),
+            DefinitionProperty {
+                description: None,
+                type_field: None,
+                _ref: None,
+                items: None,
+            },
+        );
+
+        let response = create_raw_type_from_properties(&properties);
+
+        assert!(response.contains("some:never;"));
     }
 }
