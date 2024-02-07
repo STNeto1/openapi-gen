@@ -13,24 +13,21 @@ pub struct Schema {
     host: String,
     #[serde(rename = "basePath")]
     base_path: String,
-    paths: HashMap<String, Path>,
+    pub paths: HashMap<String, Path>,
     pub definitions: DefinitionMap,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct Path {
+pub struct Path {
     get: Option<Operation>,
     post: Option<Operation>,
     put: Option<Operation>,
     delete: Option<Operation>,
     patch: Option<Operation>,
-    options: Option<Operation>,
-    head: Option<Operation>,
-    trace: Option<Operation>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct Operation {
+pub struct Operation {
     description: String,
     parameters: Vec<OperationParameter>,
     responses: OperationResponseMap,
@@ -55,6 +52,13 @@ struct ResponsePayload {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SchemaRef {
+    #[serde(rename = "type")]
+    type_ref: Option<String>,
+    items: Option<SchemaRefItems>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct SchemaRefItems {
     #[serde(rename = "$ref")]
     _ref: Option<String>,
 }
@@ -256,6 +260,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Integer),
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
 
@@ -275,6 +280,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Integer),
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
         properties.insert(
@@ -284,6 +290,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::String),
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
 
@@ -303,6 +310,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Integer),
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
         properties.insert(
@@ -312,6 +320,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::String),
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
         properties.insert(
@@ -321,6 +330,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Boolean),
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
         properties.insert(
@@ -330,6 +340,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Array),
                 _ref: Some("ref_type".to_string()),
                 items: None,
+                additional_properties: None,
             },
         );
 
@@ -344,6 +355,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Array),
                 _ref: None,
                 items: Some(some_5_items),
+                additional_properties: None,
             },
         );
 
@@ -354,6 +366,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Object),
                 _ref: Some("ref_type".to_string()),
                 items: None,
+                additional_properties: None,
             },
         );
 
@@ -368,6 +381,7 @@ mod test {
                 type_field: Some(DefinitionPropertyType::Object),
                 _ref: None,
                 items: Some(some_7_items),
+                additional_properties: None,
             },
         );
 
@@ -392,6 +406,7 @@ mod test {
                 type_field: None,
                 _ref: Some("ref_type".to_string()),
                 items: None,
+                additional_properties: None,
             },
         );
 
@@ -410,6 +425,7 @@ mod test {
                 type_field: None,
                 _ref: None,
                 items: None,
+                additional_properties: None,
             },
         );
 

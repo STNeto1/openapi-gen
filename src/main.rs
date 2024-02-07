@@ -6,6 +6,31 @@ mod parser;
 
 fn main() {
     let input_file = fs::read_to_string("example.json").expect("Unable to read file");
+    // let mut output_file = File::create("types.ts").expect("Unable to create file");
+    // let mut fetcher_output_file = File::create("fetcher.ts").expect("Unable to create file");
+
+    let schema: parser::Schema = serde_json::from_str(&input_file).expect("Unable to parse JSON");
+
+    // let mut result: HashMap<String, String> = HashMap::new();
+
+    schema.paths.iter().for_each(|(key, value)| {
+        if key == "/apps" {
+            println!("{} -> {:?}\n\n\n", key, value);
+        }
+    });
+
+    // let mut keys: Vec<&String> = result.keys().collect();
+    // keys.sort();
+    //
+    // keys.iter().for_each(|key| {
+    //     fetcher_output_file
+    //         .write_all(format!("export type {} = {};\n", key, result.get(*key).unwrap()).as_bytes())
+    //         .expect("Unable to write data");
+    // });
+}
+
+fn main_2() {
+    let input_file = fs::read_to_string("example.json").expect("Unable to read file");
     let mut output_file = File::create("types.ts").expect("Unable to create file");
 
     let schema: parser::Schema = serde_json::from_str(&input_file).expect("Unable to parse JSON");
