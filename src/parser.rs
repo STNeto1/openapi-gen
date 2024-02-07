@@ -114,34 +114,45 @@ fn create_raw_type_from_properties(props: &DefinitionPropertyMap) -> String {
     let mut res = String::new();
     res.push_str("{");
 
-    props.iter().for_each(|(key, _value)| {
+    props.iter().for_each(|(key, value)| {
         let mut inner = String::new();
 
         inner.push_str(format!("{}:", key).as_str());
 
-        if _value.type_field.is_some() {
-            match _value.type_field.clone().unwrap() {
+        if value.type_field.is_some() {
+            match value.type_field.clone().unwrap() {
                 DefinitionPropertyType::String => inner.push_str("string;"),
                 DefinitionPropertyType::Integer => inner.push_str("number;"),
                 DefinitionPropertyType::Boolean => inner.push_str("boolean;"),
                 DefinitionPropertyType::Array => {
-                    if _value._ref.is_some() {
-                        inner.push_str(format!("{}[];", _value._ref.clone().unwrap()).as_str())
+                    if value._ref.is_some() {
+                        inner.push_str(format!("{}[];", value._ref.clone().unwrap()).as_str())
                     }
 
-                    if _value.items.is_some() {
-                        let encoded = encode_kv_to_ts_object(&_value.items.clone().unwrap());
+                    if value.items.is_some() {
+                        let encoded = encode_kv_to_ts_object(&value.items.clone().unwrap());
 
                         inner.push_str(format!("{{{}}}[];", encoded).as_str());
                     }
 
-                    if _value._ref.is_none() && _value.items.is_none() {
+                    if value._ref.is_none() && value.items.is_none() {
                         warn!("Array type without ref or items");
                     }
                 }
                 DefinitionPropertyType::Object => {
-                    dbg!(_value);
-                    inner.push_str("object");
+                    if value._ref.is_some() {
+                        inner.push_str(format!("{};", value._ref.clone().unwrap()).as_str())
+                    }
+
+                    if value.items.is_some() {
+                        let encoded = encode_kv_to_ts_object(&value.items.clone().unwrap());
+
+                        inner.push_str(format!("{{{}}};", encoded).as_str());
+                    }
+
+                    if value._ref.is_none() && value.items.is_none() {
+                        warn!("Object type without ref or items");
+                    }
                 }
             }
         }
@@ -273,6 +284,30 @@ mod test {
             },
         );
 
+        properties.insert(
+            "some6".into(),
+            DefinitionProperty {
+                description: None,
+                type_field: Some(DefinitionPropertyType::Object),
+                _ref: Some("ref_type".to_string()),
+                items: None,
+            },
+        );
+
+        let some_7_items: KV = [("some".to_string(), "string".to_string())]
+            .iter()
+            .cloned()
+            .collect();
+        properties.insert(
+            "some7".into(),
+            DefinitionProperty {
+                description: None,
+                type_field: Some(DefinitionPropertyType::Object),
+                _ref: None,
+                items: Some(some_7_items),
+            },
+        );
+
         let response = create_raw_type_from_properties(&properties);
 
         // println!("{}", response);
@@ -282,5 +317,7 @@ mod test {
         assert!(response.contains("some3:boolean;"));
         assert!(response.contains("some4:ref_type[];"));
         assert!(response.contains("some5:{some:string;}[];"));
+        assert!(response.contains("some6:ref_type;"));
+        assert!(response.contains("some7:{some:string;}"));
     }
 }
