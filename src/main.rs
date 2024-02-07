@@ -14,6 +14,7 @@ fn main() {
 
     schema.definitions.iter().for_each(|(key, value)| {
         let parsed_key = parser::normalize_key(key);
+
         let raw_type = if value._enum.is_some() {
             parser::parse_enum(value)
         } else {

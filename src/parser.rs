@@ -98,6 +98,8 @@ pub struct DefinitionProperty {
     #[serde(rename = "$ref")]
     _ref: Option<String>,
     items: Option<KV>,
+    #[serde(rename = "additionalProperties")]
+    additional_properties: Option<KV>,
 }
 
 fn encode_kv_to_ts_object(kv: &KV) -> String {
@@ -179,8 +181,19 @@ pub fn create_raw_type_from_properties(props: &DefinitionPropertyMap) -> String 
                             inner.push_str(format!("{{{encoded}}};").as_str());
                         }
 
-                        if value._ref.is_none() && value.items.is_none() {
-                            warn!("Object type without ref or items");
+                        if value.additional_properties.is_some() {
+                            let encoded = encode_kv_to_ts_object(
+                                &value.additional_properties.clone().unwrap(),
+                            );
+
+                            inner.push_str(format!("{{{encoded}}};").as_str());
+                        }
+
+                        if value._ref.is_none()
+                            && value.items.is_none()
+                            && value.additional_properties.is_none()
+                        {
+                            warn!("Object type without ref, items, additional properties");
 
                             inner.push_str("never;");
                         }
