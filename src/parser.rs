@@ -29,6 +29,8 @@ pub struct Path {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Operation {
     description: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
     pub parameters: Vec<OperationParameter>,
     responses: OperationResponseMap,
 }

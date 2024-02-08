@@ -16,22 +16,25 @@ fn main() {
 
     schema.paths.iter().for_each(|(key, value)| {
         if key == "/apps" || key == "/apps/{app_name}/volumes/{volume_id}" {
+            let _get = value.get.clone().unwrap();
+
             let query_type = if value.get.is_some() {
-                value.get.clone().unwrap().parse_query()
+                _get.parse_query()
             } else {
                 unimplemented!("No query type for {}", key)
             };
 
             let path_type = if value.get.is_some() {
-                value.get.clone().unwrap().parse_path()
+                _get.parse_path()
             } else {
                 unimplemented!("No path type for {}", key)
             };
 
             let tmp_key = sanitizer::create_input_type_name_from_path(key);
+            let fn_name = _get.operation_id;
             println!("type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};");
             println!(
-                r#"export async function getApps(props: {tmp_key}) {{
+                r#"export async function get_{fn_name}(props: {tmp_key}) {{
     return fetcher<unknown, unknown>("{key}", props);
 }}"#
             );
