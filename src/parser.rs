@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 type DefinitionMap = HashMap<String, Definition>;
-type OperationResponseMap = HashMap<String, ResponsePayload>;
+pub type OperationResponseMap = HashMap<String, ResponsePayload>;
 pub type DefinitionPropertyMap = HashMap<String, DefinitionProperty>;
 type KV = HashMap<String, String>;
 
@@ -32,7 +32,7 @@ pub struct Operation {
     #[serde(rename = "operationId")]
     pub operation_id: String,
     pub parameters: Vec<OperationParameter>,
-    responses: OperationResponseMap,
+    pub responses: OperationResponseMap,
 }
 
 impl Operation {
@@ -151,13 +151,42 @@ pub struct OperationParameter {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct ResponsePayload {
+pub struct ResponsePayload {
     description: String,
-    schema: Option<SchemaRef>,
+    pub schema: Option<SchemaRef>,
+}
+
+impl ResponsePayload {
+    pub fn parse_response(&self) -> String {
+        match self.schema {
+            Some(ref schema) => {
+                let mut builder = String::new();
+
+                match schema.type_ref {
+                    Some(ref _type) => {
+                        builder.push_str("Promise<");
+                        builder.push_str(clear_ref(_type).as_str());
+                        builder.push_str(">");
+                    }
+                    None => {
+                        builder.push_str("Promise<");
+                        builder.push_str("any");
+                        builder.push_str(">");
+                    }
+                }
+
+                return builder;
+            }
+            None => {
+                warn!("No schema found for response");
+                return "Promise<any>".to_string();
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct SchemaRef {
+pub struct SchemaRef {
     #[serde(rename = "$ref")]
     type_ref: Option<String>,
     items: Option<SchemaRefItems>,
