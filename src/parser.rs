@@ -19,7 +19,7 @@ pub struct Schema {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Path {
-    get: Option<Operation>,
+    pub get: Option<Operation>,
     post: Option<Operation>,
     put: Option<Operation>,
     delete: Option<Operation>,
@@ -29,19 +29,123 @@ pub struct Path {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Operation {
     description: String,
-    parameters: Vec<OperationParameter>,
+    pub parameters: Vec<OperationParameter>,
     responses: OperationResponseMap,
 }
 
+impl Operation {
+    pub fn parse_query(&self) -> String {
+        let mut builder = String::new();
+
+        self.parameters
+            .iter()
+            .filter_map(|p| match p.in_field.clone() {
+                OperationParameterField::Query => Some(p),
+                _ => None,
+            })
+            .for_each(|param| {
+                if !builder.is_empty() {
+                    builder.push_str(", ");
+                }
+
+                builder.push_str(param.name.as_str());
+                builder.push_str(": ");
+                builder.push_str(self.parse_inner_type(param).as_str());
+            });
+
+        return builder;
+    }
+
+    pub fn parse_path(&self) -> String {
+        let mut builder = String::new();
+
+        self.parameters
+            .iter()
+            .filter_map(|p| match p.in_field.clone() {
+                OperationParameterField::Path => Some(p),
+                _ => None,
+            })
+            .for_each(|param| {
+                if !builder.is_empty() {
+                    builder.push_str(", ");
+                }
+
+                builder.push_str(param.name.as_str());
+                builder.push_str(": ");
+
+                builder.push_str(self.parse_inner_type(param).as_str());
+            });
+
+        return builder;
+    }
+
+    fn parse_inner_type(&self, operation: &OperationParameter) -> String {
+        let mut tokens = Vec::with_capacity(2);
+
+        match (&operation.type_field, operation.required) {
+            (None, None) => tokens.push("never"),
+            (None, Some(_)) => tokens.push("never"),
+            (Some(field), None) => {
+                match field {
+                    OperationParameterType::String => tokens.push("string"),
+                    OperationParameterType::Integer => tokens.push("number"),
+                    OperationParameterType::Boolean => tokens.push("boolean"),
+                    _ => todo!("[not impl] -> {:?}", field),
+                }
+
+                tokens.push("undefined");
+            }
+            (Some(field), Some(is_req)) => {
+                match field {
+                    OperationParameterType::String => tokens.push("string"),
+                    OperationParameterType::Integer => tokens.push("number"),
+                    OperationParameterType::Boolean => tokens.push("boolean"),
+                    _ => todo!("[not impl] -> {:?}", field),
+                }
+
+                if !is_req {
+                    tokens.push("undefined | null");
+                }
+            }
+        }
+
+        return tokens.join(" | ");
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct OperationParameter {
+pub enum OperationParameterType {
+    #[serde(rename = "string")]
+    String,
+    #[serde(rename = "integer")]
+    Integer,
+    #[serde(rename = "boolean")]
+    Boolean,
+    #[serde(rename = "array")]
+    Array,
+    #[serde(rename = "object")]
+    Object,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum OperationParameterField {
+    #[serde(rename = "query")]
+    Query,
+    #[serde(rename = "body")]
+    Body,
+    #[serde(rename = "path")]
+    Path,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OperationParameter {
     #[serde(rename = "type")]
-    type_field: Option<String>,
+    pub type_field: Option<OperationParameterType>,
     description: String,
-    name: String,
+    pub name: String,
     #[serde(rename = "in")]
-    in_field: String,
-    required: Option<bool>,
+    pub in_field: OperationParameterField,
+    pub required: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -52,7 +156,7 @@ struct ResponsePayload {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SchemaRef {
-    #[serde(rename = "type")]
+    #[serde(rename = "$ref")]
     type_ref: Option<String>,
     items: Option<SchemaRefItems>,
 }

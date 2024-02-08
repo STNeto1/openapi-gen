@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::io::prelude::*;
 
 mod parser;
+mod sanitizer;
 
 fn main() {
     let input_file = fs::read_to_string("example.json").expect("Unable to read file");
@@ -14,8 +15,27 @@ fn main() {
     // let mut result: HashMap<String, String> = HashMap::new();
 
     schema.paths.iter().for_each(|(key, value)| {
-        if key == "/apps" {
-            println!("{} -> {:?}\n\n\n", key, value);
+        if key == "/apps" || key == "/apps/{app_name}/volumes/{volume_id}" {
+            let query_type = if value.get.is_some() {
+                value.get.clone().unwrap().parse_query()
+            } else {
+                unimplemented!("No query type for {}", key)
+            };
+
+            let path_type = if value.get.is_some() {
+                value.get.clone().unwrap().parse_path()
+            } else {
+                unimplemented!("No path type for {}", key)
+            };
+
+            let tmp_key = sanitizer::create_input_type_name_from_path(key);
+            println!("type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};");
+            println!(
+                r#"export async function getApps(props: {tmp_key}) {{
+    return fetcher<unknown, unknown>("{key}", props);
+}}"#
+            );
+            println!("");
         }
     });
 
