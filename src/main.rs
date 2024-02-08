@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
 
+use log::warn;
+
 mod parser;
 mod sanitizer;
 
@@ -72,65 +74,68 @@ async function fetcher<TResult, TErr>(
     ));
 
     schema.paths.iter().for_each(|(key, value)| {
-        if key == "/apps" || key == "/apps/{app_name}/volumes/{volume_id}" {
-            let _get = value.get.clone().unwrap();
+        if value.get.is_none() {
+            warn!("No get method for {}", key);
+            return;
+        }
 
-            let _2xx_response = _get
-                .responses
+        let _get = value.get.clone().unwrap();
+
+        let _2xx_response = _get
+            .responses
+            .iter()
+            .filter(|(key, _)| key.starts_with("2"))
+            .collect::<Vec<_>>();
+        let _4xx_response = _get
+            .responses
+            .iter()
+            .filter(|(key, _)| key.starts_with("4"))
+            .collect::<Vec<_>>();
+
+        let query_type = if value.get.is_some() {
+            _get.parse_query()
+        } else {
+            unimplemented!("No query type for {}", key)
+        };
+
+        let path_type = if value.get.is_some() {
+            _get.parse_path()
+        } else {
+            unimplemented!("No path type for {}", key)
+        };
+
+        let tmp_key = sanitizer::create_input_type_name_from_path(key);
+        let fn_name = _get.operation_id;
+
+        lines.push(format!(
+            "type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};"
+        ));
+
+        lines.push(format!(
+            "type {fn_name}_response = {};",
+            _2xx_response
                 .iter()
-                .filter(|(key, _)| key.starts_with("2"))
-                .collect::<Vec<_>>();
-            let _4xx_response = _get
-                .responses
-                .iter()
-                .filter(|(key, _)| key.starts_with("4"))
-                .collect::<Vec<_>>();
-
-            let query_type = if value.get.is_some() {
-                _get.parse_query()
+                .map(|(_, value)| value.parse_response())
+                .collect::<Vec<_>>()
+                .join(" | ")
+        ));
+        lines.push(format!(
+            "type {fn_name}_error = {};",
+            if _4xx_response.is_empty() {
+                "never".to_string()
             } else {
-                unimplemented!("No query type for {}", key)
-            };
-
-            let path_type = if value.get.is_some() {
-                _get.parse_path()
-            } else {
-                unimplemented!("No path type for {}", key)
-            };
-
-            let tmp_key = sanitizer::create_input_type_name_from_path(key);
-            let fn_name = _get.operation_id;
-
-            lines.push(format!(
-                "type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};"
-            ));
-
-            lines.push(format!(
-                "type {fn_name}_response = {};",
-                _2xx_response
+                _4xx_response
                     .iter()
                     .map(|(_, value)| value.parse_response())
                     .collect::<Vec<_>>()
                     .join(" | ")
-            ));
-            lines.push(format!(
-                "type {fn_name}_error = {};",
-                if _4xx_response.is_empty() {
-                    "never".to_string()
-                } else {
-                    _4xx_response
-                        .iter()
-                        .map(|(_, value)| value.parse_response())
-                        .collect::<Vec<_>>()
-                        .join(" | ")
-                }
-            ));
-            lines.push(format!(
-                r#"export async function get_{fn_name}(props: {tmp_key}) {{
+            }
+        ));
+        lines.push(format!(
+            r#"export async function get_{fn_name}(props: {tmp_key}) {{
     return fetcher<{fn_name}_response, {fn_name}_error>("{key}", props);
 }}"#
-            ));
-        }
+        ));
     });
 
     lines.iter().for_each(|line| {
