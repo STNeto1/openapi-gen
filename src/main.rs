@@ -42,7 +42,7 @@ fn main() {
 
     lines.push(format!(
         r#"
-type Record = {{ [key: string]: string }};
+type Record = {{ [key: string]: string | undefuned }};
 
 async function fetcher<TResult, TErr>(
   url: string,
@@ -57,7 +57,12 @@ async function fetcher<TResult, TErr>(
 
   const completeUrl = new URL(_url);
   Object.keys(params.query).forEach((key) => {{
-    completeUrl.searchParams.append(key, params.query[key]);
+    const val = params.query[key];
+    if (!val) {{
+        return;
+    }}
+
+    completeUrl.searchParams.append(key, val);
   }});
 
   const res = await fetch(completeUrl, _init);
@@ -108,11 +113,11 @@ async function fetcher<TResult, TErr>(
         let fn_name = _get.operation_id;
 
         lines.push(format!(
-            "type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};"
+            "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
         ));
 
         lines.push(format!(
-            "type {fn_name}_response = {};",
+            "type {fn_name}_response = {};\n",
             _2xx_response
                 .iter()
                 .map(|(_, value)| value.parse_response())
@@ -120,7 +125,7 @@ async function fetcher<TResult, TErr>(
                 .join(" | ")
         ));
         lines.push(format!(
-            "type {fn_name}_error = {};",
+            "type {fn_name}_error = {};\n",
             if _4xx_response.is_empty() {
                 "never".to_string()
             } else {
@@ -134,7 +139,8 @@ async function fetcher<TResult, TErr>(
         lines.push(format!(
             r#"export async function get_{fn_name}(props: {tmp_key}) {{
     return fetcher<{fn_name}_response, {fn_name}_error>("{key}", props);
-}}"#
+}}
+"#
         ));
     });
 
