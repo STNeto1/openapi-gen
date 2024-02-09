@@ -148,6 +148,8 @@ pub struct OperationParameter {
     #[serde(rename = "in")]
     pub in_field: OperationParameterField,
     pub required: Option<bool>,
+    #[serde(rename = "schema")]
+    pub ref_field: Option<SchemaRef>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
