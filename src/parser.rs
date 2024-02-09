@@ -169,9 +169,7 @@ impl ResponsePayload {
                         builder.push_str(">");
                     }
                     None => {
-                        builder.push_str("Promise<");
-                        builder.push_str("any");
-                        builder.push_str(">");
+                        builder.push_str("Promise<unknown>");
                     }
                 }
 
@@ -179,7 +177,7 @@ impl ResponsePayload {
             }
             None => {
                 warn!("No schema found for response");
-                return "Promise<any>".to_string();
+                return "Promise<unknown>".to_string();
             }
         }
     }
