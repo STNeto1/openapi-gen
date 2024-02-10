@@ -10,7 +10,14 @@ pub fn generate_file_lines(schema: parser::Schema) -> Vec<String> {
     generate_baselines(&mut lines);
     generate_definition_types(&schema, &mut lines);
 
-    generate_fetchers(&schema, &mut lines);
+    schema.paths.iter().for_each(|(key, value)| {
+        if value.get.is_none() {
+            warn!("No get method for {}", key);
+            return;
+        }
+
+        generate_fetcher(key, value.get.clone().unwrap(), &mut lines)
+    });
 
     return lines;
 }
@@ -142,70 +149,52 @@ fn generate_definition_types(schema: &parser::Schema, lines: &mut Vec<String>) {
     });
 }
 
-fn generate_fetchers(schema: &parser::Schema, lines: &mut Vec<String>) {
-    schema.paths.iter().for_each(|(key, value)| {
-        if value.get.is_none() {
-            warn!("No get method for {}", key);
-            return;
-        }
+fn generate_fetcher(key: &String, op: parser::Operation, lines: &mut Vec<String>) {
+    let _2xx_responses = op
+        .responses
+        .iter()
+        .filter(|(key, _)| key.starts_with("2"))
+        .collect::<Vec<_>>();
+    let non_2xx_responses = op
+        .responses
+        .iter()
+        .filter(|(key, _)| key.starts_with("4") || key.starts_with("5"))
+        .collect::<Vec<_>>();
 
-        let _get = value.get.clone().unwrap();
+    let query_type = op.parse_query();
+    let path_type = op.parse_path();
 
-        let _2xx_responses = _get
-            .responses
+    let tmp_key = sanitizer::create_input_type_name_from_path(key);
+    let fn_name = generate_fn_name("get".to_string(), key.to_string());
+
+    lines.push(format!(
+        "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
+    ));
+
+    lines.push(format!(
+        "type {fn_name}_response = {};\n",
+        _2xx_responses
             .iter()
-            .filter(|(key, _)| key.starts_with("2"))
-            .collect::<Vec<_>>();
-        let non_2xx_responses = _get
-            .responses
-            .iter()
-            .filter(|(key, _)| key.starts_with("4") || key.starts_with("5"))
-            .collect::<Vec<_>>();
-
-        let query_type = if value.get.is_some() {
-            _get.parse_query()
+            .map(|(_, value)| value.parse_response())
+            .collect::<Vec<_>>()
+            .join(" | ")
+    ));
+    lines.push(format!(
+        "type {fn_name}_error = {};\n",
+        if non_2xx_responses.is_empty() {
+            "never".to_string()
         } else {
-            unimplemented!("No query type for {}", key)
-        };
-
-        let path_type = if value.get.is_some() {
-            _get.parse_path()
-        } else {
-            unimplemented!("No path type for {}", key)
-        };
-
-        let tmp_key = sanitizer::create_input_type_name_from_path(key);
-        let fn_name = generate_fn_name("get".to_string(), key.to_string());
-
-        lines.push(format!(
-            "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
-        ));
-
-        lines.push(format!(
-            "type {fn_name}_response = {};\n",
-            _2xx_responses
+            non_2xx_responses
                 .iter()
                 .map(|(_, value)| value.parse_response())
                 .collect::<Vec<_>>()
                 .join(" | ")
-        ));
-        lines.push(format!(
-            "type {fn_name}_error = {};\n",
-            if non_2xx_responses.is_empty() {
-                "never".to_string()
-            } else {
-                non_2xx_responses
-                    .iter()
-                    .map(|(_, value)| value.parse_response())
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            }
-        ));
-        lines.push(format!(
-            r#"export async function get_{fn_name}(props: {tmp_key}) {{
+        }
+    ));
+    lines.push(format!(
+        r#"export async function get_{fn_name}(props: {tmp_key}) {{
     return fetcher<{fn_name}_response, {fn_name}_error>("{key}", props);
 }}
 "#
-        ));
-    });
+    ));
 }
