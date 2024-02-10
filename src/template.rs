@@ -102,7 +102,7 @@ async function fetcher<TResult, TErr>(
         };
 
         let tmp_key = sanitizer::create_input_type_name_from_path(key);
-        let fn_name = _get.operation_id;
+        let fn_name = generate_fn_name("get".to_string(), key.to_string());
 
         lines.push(format!(
             "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
@@ -137,4 +137,24 @@ async function fetcher<TResult, TErr>(
     });
 
     return lines;
+}
+
+fn generate_fn_name(method: String, path: String) -> String {
+    let mut fn_name = method.to_lowercase();
+    fn_name.push_str("_");
+
+    path.split("/").filter(|&x| !x.is_empty()).for_each(|x| {
+        if x.starts_with("{") && x.ends_with("}") {
+            fn_name.push_str("by_");
+        } else {
+            fn_name.push_str(x);
+            fn_name.push_str("_");
+        }
+    });
+
+    if fn_name.ends_with("_") {
+        fn_name = fn_name.trim_end_matches('_').to_string();
+    }
+
+    fn_name
 }

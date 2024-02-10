@@ -29,9 +29,7 @@ pub struct Path {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Operation {
     description: String,
-    #[serde(rename = "operationId")]
-    pub operation_id: String,
-    pub parameters: Vec<OperationParameter>,
+    pub parameters: Option<Vec<OperationParameter>>,
     pub responses: OperationResponseMap,
 }
 
@@ -39,7 +37,13 @@ impl Operation {
     pub fn parse_query(&self) -> String {
         let mut builder = String::new();
 
-        self.parameters
+        let params = if self.parameters.is_some() {
+            self.parameters.clone().unwrap()
+        } else {
+            Vec::new()
+        };
+
+        params
             .iter()
             .filter_map(|p| match p.in_field.clone() {
                 OperationParameterField::Query => Some(p),
@@ -61,7 +65,13 @@ impl Operation {
     pub fn parse_path(&self) -> String {
         let mut builder = String::new();
 
-        self.parameters
+        let params = if self.parameters.is_some() {
+            self.parameters.clone().unwrap()
+        } else {
+            Vec::new()
+        };
+
+        params
             .iter()
             .filter_map(|p| match p.in_field.clone() {
                 OperationParameterField::Path => Some(p),
@@ -121,6 +131,8 @@ pub enum OperationParameterType {
     String,
     #[serde(rename = "integer")]
     Integer,
+    #[serde(rename = "number")]
+    Number,
     #[serde(rename = "boolean")]
     Boolean,
     #[serde(rename = "array")]
@@ -223,6 +235,8 @@ enum DefinitionPropertyType {
     Array,
     #[serde(rename = "integer")]
     Integer,
+    #[serde(rename = "number")]
+    Number,
     #[serde(rename = "boolean")]
     Boolean,
     #[serde(rename = "object")]
@@ -244,9 +258,11 @@ pub struct DefinitionProperty {
 fn encode_kv_to_ts_object(kv: &KV) -> String {
     let mut res = String::new();
 
-    kv.iter().for_each(|(key, value)| {
-        res.push_str(format!("{}:{};", key, clear_ref(value)).as_str());
-    });
+    kv.iter()
+        .for_each(|(key, value)| match *value == "integer".to_string() {
+            true => res.push_str(format!("{key}:{};", "number").as_str()),
+            false => res.push_str(format!("{key}:{};", clear_ref(value)).as_str()),
+        });
 
     return res;
 }
@@ -284,6 +300,7 @@ pub fn create_raw_type_from_properties(props: &DefinitionPropertyMap) -> String 
                 match value.type_field.clone().unwrap() {
                     DefinitionPropertyType::String => inner.push_str("string;"),
                     DefinitionPropertyType::Integer => inner.push_str("number;"),
+                    DefinitionPropertyType::Number => inner.push_str("number;"),
                     DefinitionPropertyType::Boolean => inner.push_str("boolean;"),
                     DefinitionPropertyType::Array => {
                         if value._ref.is_some() {
@@ -519,6 +536,16 @@ mod test {
                 additional_properties: None,
             },
         );
+        properties.insert(
+            "some8".into(),
+            DefinitionProperty {
+                description: None,
+                type_field: Some(DefinitionPropertyType::Integer),
+                _ref: None,
+                items: None,
+                additional_properties: None,
+            },
+        );
 
         let response = create_raw_type_from_properties(&properties);
 
@@ -529,6 +556,7 @@ mod test {
         assert!(response.contains("some5:{some:string;}[];"));
         assert!(response.contains("some6:ref_type;"));
         assert!(response.contains("some7:{some:string;}"));
+        assert!(response.contains("some8:number;"));
     }
 
     #[test]

@@ -6,7 +6,7 @@ mod sanitizer;
 mod template;
 
 fn main() {
-    let input_file = fs::read_to_string("example.json").expect("Unable to read file");
+    let input_file = fs::read_to_string("input.json").expect("Unable to read file");
     let mut output_file = File::create("types.ts").expect("Unable to create file");
 
     let schema: parser::Schema = serde_json::from_str(&input_file).expect("Unable to parse JSON");
