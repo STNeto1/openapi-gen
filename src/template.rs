@@ -35,27 +35,43 @@ pub fn generate_file_lines(schema: parser::Schema) -> Vec<String> {
     lines.push(format!(
         r#"
 type Record = {{ [key: string]: string | number | boolean | undefined }};
+type Params = {{ query: Record; path: Record }};
+
+function createUrl(url: string, params: Params) {{
+	const _url = Object.keys(params || {{}}).reduce(
+		(acc, key) => acc.replace(`{{${{key}}}}`, params[key]),
+		url,
+	);
+
+	const completeUrl = new URL(_url);
+	Object.keys(params.query).forEach((key) => {{
+		completeUrl.searchParams.append(key, params.query[key]?.toString() ?? "");
+	}});
+
+	return completeUrl;
+}}
 
 async function fetcher<TResult, TErr>(
   url: string,
   params: {{ query: Record; path: Record }},
   init?: RequestInit,
 ) {{
-  const _init = init ? {{ ...init, method: "GET" }} : {{ method: "GET" }};
-  const _url = Object.keys(params || {{}}).reduce(
-    (acc, key) => acc.replace(`{{$key}}`, params[key]),
-    url,
-  );
 
-  const completeUrl = new URL(_url);
-  Object.keys(params.query).forEach((key) => {{
-    const val = params.query[key];
-    if (!val) {{
-        return;
-    }}
+const _init = init ? {{ ...init, method: "GET" }} : {{ method: "GET" }};
+const _url = Object.keys(params || {{}}).reduce(
+	(acc, key) => acc.replace(`{{$key}}`, params[key]),
+	url,
+);
 
-    completeUrl.searchParams.append(key, val.toString());
-  }});
+const completeUrl = new URL(_url);
+Object.keys(params.query).forEach((key) => {{
+	const val = params.query[key];
+	if (!val) {{
+		return;
+	}}
+
+	completeUrl.searchParams.append(key, val.toString());
+}});
 
   const res = await fetch(completeUrl, _init);
   const bodyData = await res.json();
@@ -65,6 +81,29 @@ async function fetcher<TResult, TErr>(
   }}
 
   return bodyData as TResult;
+}}
+
+
+async function mutator<TBody, TResult, TErr>(
+	method: "POST" | "PUT" | "DELETE" | "PATCH",
+	url: string,
+	params: Params,
+	body: TBody | null,
+	init?: RequestInit,
+) {{
+	const _init = Object.assign(init ?? {{}}, {{
+		method,
+		body: body ? JSON.stringify(body) : undefined,
+	}});
+
+	const res = await fetch(createUrl(url, params), _init);
+	const bodyData = await res.json();
+
+	if (!res.ok) {{
+		return bodyData as TErr;
+	}}
+
+	return bodyData as TResult;
 }}
 
 "#
@@ -78,12 +117,12 @@ async function fetcher<TResult, TErr>(
 
         let _get = value.get.clone().unwrap();
 
-        let _2xx_response = _get
+        let _2xx_responses = _get
             .responses
             .iter()
             .filter(|(key, _)| key.starts_with("2"))
             .collect::<Vec<_>>();
-        let _4xx_response = _get
+        let non_2xx_responses = _get
             .responses
             .iter()
             .filter(|(key, _)| key.starts_with("4"))
@@ -110,7 +149,7 @@ async function fetcher<TResult, TErr>(
 
         lines.push(format!(
             "type {fn_name}_response = {};\n",
-            _2xx_response
+            _2xx_responses
                 .iter()
                 .map(|(_, value)| value.parse_response())
                 .collect::<Vec<_>>()
@@ -118,10 +157,10 @@ async function fetcher<TResult, TErr>(
         ));
         lines.push(format!(
             "type {fn_name}_error = {};\n",
-            if _4xx_response.is_empty() {
+            if non_2xx_responses.is_empty() {
                 "never".to_string()
             } else {
-                _4xx_response
+                non_2xx_responses
                     .iter()
                     .map(|(_, value)| value.parse_response())
                     .collect::<Vec<_>>()
