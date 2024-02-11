@@ -29,7 +29,12 @@ struct Config {
 impl Config {
     fn get_data(&self) -> Result<String> {
         if Url::parse(&self.source).is_ok() {
-            unimplemented!("Fetching from URL is not yet implemented");
+            let body = reqwest::blocking::get(&self.source)
+                .context("Failed to fetch data from URL")?
+                .text()
+                .context("Failed to read response body")?;
+
+            return Ok(body);
         };
 
         let file_contents = std::fs::read_to_string(&self.source).context("Unable to read file")?;
