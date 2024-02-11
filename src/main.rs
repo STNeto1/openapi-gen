@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::{Context, Ok, Result};
 use std::fs::{self, create_dir_all, File};
 use std::io::prelude::*;
 
@@ -17,9 +17,10 @@ fn main() -> Result<()> {
         .join("/");
 
     create_dir_all(folder_path)?;
-    let mut output_file = File::create("lib/types.ts").expect("Unable to create file");
+    let mut output_file = File::create("lib/types.ts").context("Unable to create file")?;
 
-    let schema: parser::Schema = serde_json::from_str(&input_file).expect("Unable to parse JSON");
+    let schema: parser::Schema =
+        serde_json::from_str(&input_file).context("Unable to parse JSON")?;
 
     template::generate_file_lines(schema)
         .iter()
