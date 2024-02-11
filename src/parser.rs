@@ -10,9 +10,9 @@ type KV = HashMap<String, String>;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Schema {
     schemes: Vec<String>,
-    host: String,
+    pub host: String,
     #[serde(rename = "basePath")]
-    base_path: String,
+    pub base_path: String,
     pub paths: HashMap<String, Path>,
     pub definitions: DefinitionMap,
 }

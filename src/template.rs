@@ -1,4 +1,3 @@
-use log::warn;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -8,7 +7,7 @@ use crate::sanitizer;
 pub fn generate_file_lines(schema: parser::Schema) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
 
-    generate_baselines(&mut lines);
+    generate_baselines(&schema, &mut lines);
     generate_definition_types(&schema, &mut lines);
 
     schema.paths.iter().for_each(|(key, value)| {
@@ -53,7 +52,12 @@ fn generate_fn_name(method: String, path: String) -> String {
     fn_name.replace("-", "_")
 }
 
-fn generate_baselines(lines: &mut Vec<String>) {
+fn generate_baselines(schema: &parser::Schema, lines: &mut Vec<String>) {
+    let mut prefix = String::new();
+    prefix.push_str("https://");
+    prefix.push_str(&schema.host);
+    prefix.push_str(&schema.base_path);
+
     lines.push(format!(
         r#"
 type Record = {{ [key: string]: string | number | boolean | undefined }};
@@ -65,7 +69,7 @@ function createUrl(url: string, params: Params) {{
 		url,
 	);
 
-	const completeUrl = new URL(_url);
+	const completeUrl = new URL("{prefix}" + _url);
 	Object.keys(params.query).forEach((key) => {{
 		completeUrl.searchParams.append(key, params.query[key]?.toString() ?? "");
 	}});
