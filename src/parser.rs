@@ -20,10 +20,10 @@ pub struct Schema {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Path {
     pub get: Option<Operation>,
-    post: Option<Operation>,
-    put: Option<Operation>,
-    delete: Option<Operation>,
-    patch: Option<Operation>,
+    pub post: Option<Operation>,
+    pub put: Option<Operation>,
+    pub delete: Option<Operation>,
+    pub patch: Option<Operation>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -162,6 +162,25 @@ pub struct OperationParameter {
     pub required: Option<bool>,
     #[serde(rename = "schema")]
     pub ref_field: Option<SchemaRef>,
+}
+
+impl OperationParameter {
+    pub fn parse_body(&self) -> String {
+        match &self.ref_field {
+            Some(ref schema) => match schema.type_ref {
+                Some(ref _type) => {
+                    return clear_ref(_type);
+                }
+                None => {
+                    return "unknown".to_string();
+                }
+            },
+            None => {
+                warn!("No schema found for body");
+                return "unknown".to_string();
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

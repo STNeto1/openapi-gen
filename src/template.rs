@@ -11,12 +11,22 @@ pub fn generate_file_lines(schema: parser::Schema) -> Vec<String> {
     generate_definition_types(&schema, &mut lines);
 
     schema.paths.iter().for_each(|(key, value)| {
-        if value.get.is_none() {
-            warn!("No get method for {}", key);
-            return;
+        match &value.get {
+            Some(get) => generate_fetcher(key, get.clone(), &mut lines),
+            None => (),
         }
 
-        generate_fetcher(key, value.get.clone().unwrap(), &mut lines)
+        match &value.post {
+            Some(post) => generate_mutator(key, &"POST".to_string(), post.clone(), &mut lines),
+            None => (),
+        }
+
+        // if value.get.is_none() {
+        //     warn!("No get method for {}", key);
+        //     return;
+        // }
+
+        // generate_fetcher(key, value.get.clone().unwrap(), &mut lines)
     });
 
     return lines;
@@ -39,7 +49,7 @@ fn generate_fn_name(method: String, path: String) -> String {
         fn_name = fn_name.trim_end_matches('_').to_string();
     }
 
-    fn_name
+    fn_name.replace("-", "_")
 }
 
 fn generate_baselines(lines: &mut Vec<String>) {
@@ -164,7 +174,7 @@ fn generate_fetcher(key: &String, op: parser::Operation, lines: &mut Vec<String>
     let query_type = op.parse_query();
     let path_type = op.parse_path();
 
-    let tmp_key = sanitizer::create_input_type_name_from_path(key);
+    let tmp_key = sanitizer::create_input_type_name_from_path(key, None);
     let fn_name = generate_fn_name("get".to_string(), key.to_string());
 
     lines.push(format!(
@@ -197,4 +207,78 @@ fn generate_fetcher(key: &String, op: parser::Operation, lines: &mut Vec<String>
 }}
 "#
     ));
+}
+
+fn generate_mutator(key: &String, method: &String, op: parser::Operation, lines: &mut Vec<String>) {
+    let _2xx_responses = op
+        .responses
+        .iter()
+        .filter(|(key, _)| key.starts_with("2"))
+        .collect::<Vec<_>>();
+    let non_2xx_responses = op
+        .responses
+        .iter()
+        .filter(|(key, _)| key.starts_with("4") || key.starts_with("5"))
+        .collect::<Vec<_>>();
+
+    let query_type = op.parse_query();
+    let path_type = op.parse_path();
+
+    let tmp_key = sanitizer::create_input_type_name_from_path(key, Some(&method.to_lowercase()));
+    let fn_name = generate_fn_name(method.clone(), key.to_string());
+
+    lines.push(format!(
+        "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
+    ));
+
+    lines.push(format!(
+        "type {fn_name}_response = {};\n",
+        _2xx_responses
+            .iter()
+            .map(|(_, value)| value.parse_response())
+            .collect::<Vec<_>>()
+            .join(" | ")
+    ));
+    lines.push(format!(
+        "type {fn_name}_error = {};\n",
+        if non_2xx_responses.is_empty() {
+            "never".to_string()
+        } else {
+            non_2xx_responses
+                .iter()
+                .map(|(_, value)| value.parse_response())
+                .collect::<Vec<_>>()
+                .join(" | ")
+        }
+    ));
+
+    match op.parameters {
+        Some(parameters) => {
+            let body_type = parameters
+                .iter()
+                .find(|x| match x.in_field {
+                    parser::OperationParameterField::Body => true,
+                    _ => false,
+                })
+                .map(|x| x.parse_body())
+                .unwrap_or("never".to_string());
+
+            lines.push(format!("type {fn_name}_body= {body_type};\n",));
+
+            lines.push(format!(
+                r#"export async function {fn_name}(props: {tmp_key}, init?: RequestInit) {{
+    return mutator<{fn_name}_body, {fn_name}_response, {fn_name}_error>("{method}", "{key}", props, null, init);
+}}
+"#
+            ));
+        }
+        None => {
+            lines.push(format!(
+                r#"export async function {fn_name}(props: {tmp_key}, init?: RequestInit) {{
+    return mutator<never, {fn_name}_response, {fn_name}_error>("{method}", "{key}", props, null, init);
+}}
+"#
+            ));
+        }
+    }
 }
