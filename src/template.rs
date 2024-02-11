@@ -1,5 +1,6 @@
 use log::warn;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::parser;
 use crate::sanitizer;
@@ -186,6 +187,12 @@ fn generate_fetcher(key: &String, op: parser::Operation, lines: &mut Vec<String>
         _2xx_responses
             .iter()
             .map(|(_, value)| value.parse_response())
+            .fold(HashSet::new(), |mut acc, x| {
+                acc.insert(x);
+                acc
+            })
+            .iter()
+            .map(|val| val.to_string())
             .collect::<Vec<_>>()
             .join(" | ")
     ));
@@ -197,6 +204,12 @@ fn generate_fetcher(key: &String, op: parser::Operation, lines: &mut Vec<String>
             non_2xx_responses
                 .iter()
                 .map(|(_, value)| value.parse_response())
+                .fold(HashSet::new(), |mut acc, x| {
+                    acc.insert(x);
+                    acc
+                })
+                .iter()
+                .map(|val| val.to_string())
                 .collect::<Vec<_>>()
                 .join(" | ")
         }
@@ -236,6 +249,12 @@ fn generate_mutator(key: &String, method: &String, op: parser::Operation, lines:
         _2xx_responses
             .iter()
             .map(|(_, value)| value.parse_response())
+            .fold(HashSet::new(), |mut acc, x| {
+                acc.insert(x);
+                acc
+            })
+            .iter()
+            .map(|val| val.to_string())
             .collect::<Vec<_>>()
             .join(" | ")
     ));
@@ -247,6 +266,12 @@ fn generate_mutator(key: &String, method: &String, op: parser::Operation, lines:
             non_2xx_responses
                 .iter()
                 .map(|(_, value)| value.parse_response())
+                .fold(HashSet::new(), |mut acc, x| {
+                    acc.insert(x);
+                    acc
+                })
+                .iter()
+                .map(|val| val.to_string())
                 .collect::<Vec<_>>()
                 .join(" | ")
         }
