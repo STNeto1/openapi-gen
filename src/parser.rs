@@ -28,7 +28,7 @@ pub struct Path {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Operation {
-    description: String,
+    pub description: String,
     pub parameters: Option<Vec<OperationParameter>>,
     pub responses: OperationResponseMap,
 }

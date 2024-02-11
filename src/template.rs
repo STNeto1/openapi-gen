@@ -188,8 +188,9 @@ fn generate_fetcher(key: &String, op: parser::Operation, lines: &mut Vec<String>
     let tmp_key = sanitizer::create_input_type_name_from_path(key, None);
     let fn_name = generate_fn_name("get".to_string(), key.to_string());
 
+    lines.push(format!("\n\n// Description - {}\n", op.description));
     lines.push(format!(
-        "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
+        "type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
     ));
 
     lines.push(format!(
@@ -250,8 +251,9 @@ fn generate_mutator(key: &String, method: &String, op: parser::Operation, lines:
     let tmp_key = sanitizer::create_input_type_name_from_path(key, Some(&method.to_lowercase()));
     let fn_name = generate_fn_name(method.clone(), key.to_string());
 
+    lines.push(format!("\n\n// Description - {}\n", op.description));
     lines.push(format!(
-        "\n\ntype {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
+        "type {tmp_key} = {{ query: {{{query_type}}}, path: {{{path_type}}} }};\n"
     ));
 
     lines.push(format!(
