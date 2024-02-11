@@ -266,8 +266,8 @@ fn generate_mutator(key: &String, method: &String, op: parser::Operation, lines:
             lines.push(format!("type {fn_name}_body= {body_type};\n",));
 
             lines.push(format!(
-                r#"export async function {fn_name}(props: {tmp_key}, init?: RequestInit) {{
-    return mutator<{fn_name}_body, {fn_name}_response, {fn_name}_error>("{method}", "{key}", props, null, init);
+                r#"export async function {fn_name}(props: {tmp_key}, body: {fn_name}_body, init?: RequestInit) {{
+    return mutator<{fn_name}_body, {fn_name}_response, {fn_name}_error>("{method}", "{key}", props, body, init);
 }}
 "#
             ));
