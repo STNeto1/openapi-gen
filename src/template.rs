@@ -12,21 +12,27 @@ pub fn generate_file_lines(schema: parser::Schema) -> Vec<String> {
 
     schema.paths.iter().for_each(|(key, value)| {
         match &value.get {
-            Some(get) => generate_fetcher(key, get.clone(), &mut lines),
+            Some(_path) => generate_fetcher(key, _path.clone(), &mut lines),
             None => (),
         }
 
         match &value.post {
-            Some(post) => generate_mutator(key, &"POST".to_string(), post.clone(), &mut lines),
+            Some(_path) => generate_mutator(key, &"POST".to_string(), _path.clone(), &mut lines),
             None => (),
         }
 
-        // if value.get.is_none() {
-        //     warn!("No get method for {}", key);
-        //     return;
-        // }
-
-        // generate_fetcher(key, value.get.clone().unwrap(), &mut lines)
+        match &value.put {
+            Some(_path) => generate_mutator(key, &"PUT".to_string(), _path.clone(), &mut lines),
+            None => (),
+        }
+        match &value.delete {
+            Some(_path) => generate_mutator(key, &"DELETE".to_string(), _path.clone(), &mut lines),
+            None => (),
+        }
+        match &value.patch {
+            Some(_path) => generate_mutator(key, &"PATCH".to_string(), _path.clone(), &mut lines),
+            None => (),
+        }
     });
 
     return lines;
